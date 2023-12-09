@@ -1,9 +1,23 @@
 from django.shortcuts import render
 from django.urls import reverse_lazy
-from django.views.generic import ListView, DetailView,  CreateView, UpdateView, DeleteView
+from django.views.generic import ListView, DetailView,  CreateView, UpdateView, DeleteView, TemplateView
 from .models import Post
 from .filters import PostFilter
 from .forms import PostForm
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.shortcuts import render
+from django.views.generic import TemplateView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import PermissionRequiredMixin
+
+class IndexView(LoginRequiredMixin, TemplateView):
+    template_name = 'index.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['is_not_authors'] = not self.request.user.groups.filter(name='Authors').exists()
+        return context
+
 
 class PostList(ListView):
     model=Post
@@ -37,9 +51,10 @@ class PostDetail(DetailView):
     template_name = 'specific_post.html'
     context_object_name = 'post'
 
-class PostCreate(CreateView):
+class PostCreate(LoginRequiredMixin,PermissionRequiredMixin, CreateView):
     form_class = PostForm
     model = Post
+    permission_required = ('news.add_post', )
 
     def get_template_names(self):
         if self.request.path=='/news/articles/create/':
@@ -55,10 +70,11 @@ class PostCreate(CreateView):
             post.save()
         return super().form_valid(form)
 
-class PostUpdate(UpdateView):
+class PostUpdate(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     form_class = PostForm
     model = Post
     template_name = 'news_edit.html'
+    permission_required = ('news.change_post', )
 
     def get_template_names(self):
         if self.request.path==f'/news/articles/{self.object.pk}/edit/':
@@ -66,6 +82,9 @@ class PostUpdate(UpdateView):
         else:
             self.template_name='news_edit.html'
         return self.template_name
+
+    class ProtectedView(LoginRequiredMixin, TemplateView):
+        template_name = 'protected_page.html'
 
 
 class PostDelete(DeleteView):
